@@ -101,7 +101,7 @@
     [(ast:print e) (display (value-of e Δ))]
     [(ast:return e) (value-of e Δ)]
     [(ast:block stmts) (display "block unimplemented")]
-    [(ast:if-stmt e s1 s2) (display "if statment unimplemented")]
+    [(ast:if-stmt e s1 s2) (if (value-of e Δ) (result-of s1 Δ) (result-of s2 Δ))]
     [(ast:while e s) (display "while unimplemented")]
     [(ast:local-decl (ast:var x) s) (display "local var declaration unimplemented")]
     [(ast:send e (ast:var mth) args) (display "command send unimplemented")]

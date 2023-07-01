@@ -1,3 +1,3 @@
 #lang dcc019/exercise/iclasses
 
-print ¬zero?(0)
+if ¬zero?(1) print 1 print 3
