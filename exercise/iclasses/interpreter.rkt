@@ -25,6 +25,8 @@
     ; falso a ela.
     (add-class-to-env "object" (class #f '() '()))
     (add-classes-from-decls decls)
+
+    ; DEBUG
     (display class-env)
   )
 )
