@@ -27,7 +27,7 @@
     (add-classes-from-decls decls)
 
     ; DEBUG
-    (display class-env)
+    ;(display class-env)
   )
 )
 
@@ -79,7 +79,7 @@
 
 ; Função para avaliar o método no ambiente com as variáveis, os campos e os valores das variáveis self e super
 (define (apply-method method self args )
-  (value-of
+  (result-of
     (method-body method)
     (bind-vars-to-env
       (method-vars method)
@@ -125,18 +125,27 @@
 ; UTILS =======================================
 
 ; EXECUTE =======================================
-; Executa a regra send
+; Executa a regra 'send'
 (define (execute-send object-exp method-name args Δ)
   (let* ([args-with-value (map-value-of args Δ )]
          [obj (value-of object-exp Δ )])
-    (apply-method (find-method (object-class-name obj) (ast:var-name method-name)) obj args-with-value )))
+    (apply-method (find-method (object-class-name obj) method-name) obj args-with-value )))
 
-; Executa a regra new
-(define (execute-new-object class args Δ)
+; Executa a regra 'new'
+(define (execute-new-object class-name args Δ)
   (let* ([args-with-value (map-value-of args Δ )]
-         [obj (new-object-instance (ast:var-name class) )])
-    (apply-method (find-method (ast:var-name class) "initialize") obj args-with-value )
+         [obj (new-object-instance class-name )])
+    (apply-method (find-method class-name "initialize") obj args-with-value )
     obj))
+
+; Executa a regra 'self'
+(define (execute-self Δ) (apply-env Δ "self"))
+
+; Executa a regra 'super'
+(define (execute-super method-name args Δ)
+  (let ([args-with-value (map-value-of args Δ )]
+           [obj (apply-env Δ "self")])
+    (apply-method (find-method (apply-env Δ "super") (ast:var-name method-name)) obj args-with-value )))
 ; EXECUTE =======================================
 
 ; value-of :: Exp -> ExpVal
@@ -148,32 +157,32 @@
     [(ast:zero? e) (zero? (value-of e Δ))]
     [(ast:not e) (not (value-of e Δ))]
     [(ast:if e1 e2 e3) (if (value-of e1 Δ) (value-of e2 Δ) (value-of e3 Δ))]
-    [(ast:var v) (apply-env Δ v)] ; esta implementação só funciona para variáveis imutáveis
+    [(ast:var v) (deref (apply-env Δ v))]
     [(ast:let (ast:var x) e1 e2) (value-of e2 (extend-env x (value-of e1 Δ) Δ))]
-    [(ast:send e (ast:var mth) args) (display "send expression unimplemented")]
-    [(ast:super (ast:var c) args) (display "super expression unimplemented")]
-    [(ast:self) (display "self expression unimplemented")]
+    [(ast:send e (ast:var mth) args) (execute-send e mth args Δ)]
+    [(ast:super (ast:var c) args) (execute-super c args Δ)]
+    [(ast:self) (execute-self Δ)]
     [(ast:new (ast:var c) args) (execute-new-object c args Δ)]
-    [e (raise-user-error "unimplemented-construction: " e)]
+    [e (raise-user-error "unimplemented-value-of-construction: " e)]
     ))
 
 ; result-of :: Stmt -> Env -> State -> State
 (define (result-of stmt Δ)
   (match stmt
-    [(ast:assign (ast:var x) e) (display "assignment unimplemented")]
+    [(ast:assign (ast:var x) e) (begin (setref! (apply-env Δ x) (value-of e Δ)) 42)]
     [(ast:print e) (display (value-of e Δ))]
     [(ast:return e) (value-of e Δ)]
-    [(ast:block stmts) (display "block unimplemented")]
+    [(ast:block stmts) (for ([s stmts]) (result-of s Δ))]
     [(ast:if-stmt e s1 s2) (if (value-of e Δ) (result-of s1 Δ) (result-of s2 Δ))]
     [(ast:while e s) (if (value-of e Δ)
                          (begin
                            (result-of s Δ)
                            (result-of stmt Δ))
                          'done)]
-    [(ast:local-decl (ast:var x) s) (display "local var declaration unimplemented")]
+    [(ast:local-decl (ast:var x) s) (result-of s (extend-env x (newref 'null) Δ))]
     [(ast:send e (ast:var mth) args) (execute-send e mth args Δ)]
-    [(ast:super (ast:var c) args) (display "command super unimplemented")]
-    [e (raise-user-error "unimplemented-construction: " e)]
+    [(ast:super (ast:var c) args) (execute-super c args Δ)]
+    [e (raise-user-error "unimplemented-result-of-construction: " e)]
     ))
 
 (define (value-of-program prog)
