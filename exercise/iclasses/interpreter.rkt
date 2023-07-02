@@ -146,7 +146,7 @@
     [(ast:bool v) v]
     [(ast:dif e1 e2) (- (value-of e1 Δ) (value-of e2 Δ))]
     [(ast:zero? e) (zero? (value-of e Δ))]
-    [(ast:not e) (value-of e Δ)]
+    [(ast:not e) (not (value-of e Δ))]
     [(ast:if e1 e2 e3) (if (value-of e1 Δ) (value-of e2 Δ) (value-of e3 Δ))]
     [(ast:var v) (apply-env Δ v)] ; esta implementação só funciona para variáveis imutáveis
     [(ast:let (ast:var x) e1 e2) (value-of e2 (extend-env x (value-of e1 Δ) Δ))]
@@ -165,7 +165,11 @@
     [(ast:return e) (value-of e Δ)]
     [(ast:block stmts) (display "block unimplemented")]
     [(ast:if-stmt e s1 s2) (if (value-of e Δ) (result-of s1 Δ) (result-of s2 Δ))]
-    [(ast:while e s) (display "while unimplemented")]
+    [(ast:while e s) (if (value-of e Δ)
+                         (begin
+                           (result-of s Δ)
+                           (result-of stmt Δ))
+                         'done)]
     [(ast:local-decl (ast:var x) s) (display "local var declaration unimplemented")]
     [(ast:send e (ast:var mth) args) (execute-send e mth args Δ)]
     [(ast:super (ast:var c) args) (display "command super unimplemented")]
