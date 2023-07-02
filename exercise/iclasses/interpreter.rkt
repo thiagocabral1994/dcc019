@@ -76,7 +76,68 @@
    (method (map ast:var-name (ast:method-params m-decl)) (ast:method-body m-decl) super-name fields)
    )
 )
+
+; Função para avaliar o método no ambiente com as variáveis, os campos e os valores das variáveis self e super
+(define (apply-method method self args )
+  (value-of
+    (method-body method)
+    (bind-vars-to-env
+      (method-vars method)
+      (map newref args)
+      (bind-vars-to-env
+        (method-fields method)
+        (object-fields self)
+        (extend-env "self" self
+                  (extend-env "super" (method-super-name method)
+                              empty-env)))
+      )))
+
+; Função para atrelar determinados vars e values a um ambiente
+(define (bind-vars-to-env vars values env)
+  (for ([var vars] [val values])
+    (set! env (extend-env var val env)))
+  env)
+
+; Função para encontrar um método no ambiente
+(define (find-method class-name method-name )
+  (let ([m-env (class-method-env (find-class class-name))])
+    (let ([maybe-pair (assoc method-name m-env)])
+      (if (pair? maybe-pair)
+          (cadr maybe-pair)
+          (raise-user-error "method-not-found" method-name)))))
 ; ENV =======================================
+
+; UTILS =======================================
+; Função lambda para retornar o value-of de cada expressão
+(define map-value-of
+  (lambda (exps Δ)
+    (map (lambda (exp) (value-of exp Δ)) exps)
+  )
+)
+
+; Função lambda para iniciar uma nova instância de um objeto
+(define (new-object-instance class-name )
+  (object
+    class-name
+    (map (lambda (field-name) (newref null)) (class-field-names (find-class class-name)))
+  )
+)
+; UTILS =======================================
+
+; EXECUTE =======================================
+; Executa a regra send
+(define (execute-send object-exp method-name args Δ)
+  (let* ([args-with-value (map-value-of args Δ )]
+         [obj (value-of object-exp Δ )])
+    (apply-method (find-method (object-class-name obj) (ast:var-name method-name)) obj args-with-value )))
+
+; Executa a regra new
+(define (execute-new-object class args Δ)
+  (let* ([args-with-value (map-value-of args Δ )]
+         [obj (new-object-instance (ast:var-name class) )])
+    (apply-method (find-method (ast:var-name class) "initialize") obj args-with-value )
+    obj))
+; EXECUTE =======================================
 
 ; value-of :: Exp -> ExpVal
 (define (value-of exp Δ)
@@ -92,7 +153,7 @@
     [(ast:send e (ast:var mth) args) (display "send expression unimplemented")]
     [(ast:super (ast:var c) args) (display "super expression unimplemented")]
     [(ast:self) (display "self expression unimplemented")]
-    [(ast:new (ast:var c) args) (display "new expression unimplemented")]
+    [(ast:new (ast:var c) args) (execute-new-object c args Δ)]
     [e (raise-user-error "unimplemented-construction: " e)]
     ))
 
@@ -106,7 +167,7 @@
     [(ast:if-stmt e s1 s2) (if (value-of e Δ) (result-of s1 Δ) (result-of s2 Δ))]
     [(ast:while e s) (display "while unimplemented")]
     [(ast:local-decl (ast:var x) s) (display "local var declaration unimplemented")]
-    [(ast:send e (ast:var mth) args) (display "command send unimplemented")]
+    [(ast:send e (ast:var mth) args) (execute-send e mth args Δ)]
     [(ast:super (ast:var c) args) (display "command super unimplemented")]
     [e (raise-user-error "unimplemented-construction: " e)]
     ))
